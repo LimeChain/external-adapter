@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 
@@ -24,8 +23,6 @@ type DataJson struct {
 
 func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 
-	log.Println("uurl: ", req.URL)
-
 	if req.URL.Path != "/" {
 		http.Error(res, "404 not found.", http.StatusNotFound)
 		return
@@ -42,7 +39,7 @@ func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 	var jobResult JobResult
 	json.Unmarshal(buf.Bytes(), &jobResult)
 
-	transactionReceipt := submitMessageToTopic(jobResult.Data.HederaTopicId, buf.Bytes())
+	transactionReceipt := submitMessageToTopic(jobResult.Data.HederaTopicId, []byte(jobResult.Data.Result))
 
 	fmt.Fprintf(res, "{\"transactionStatus\": \"/%v\"}", transactionReceipt.Status)
 
