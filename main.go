@@ -44,7 +44,7 @@ func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 
 	transactionReceipt, err := submitMessageToTopic(jobResult.Data.HederaTopicId, []byte(jobResult.Data.Result))
 	if err != nil {
-		log.Fatalln("Error: ", err)
+		log.Println("Error: ", err)
 	}
 
 	fmt.Fprintf(res, "{\"transactionStatus\": \"/%v\"}", transactionReceipt.Status)
