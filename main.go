@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 
@@ -20,6 +21,8 @@ type DataJson struct {
 	Result        string
 	HederaTopicId string
 }
+
+var hederaClient *hedera.Client
 
 func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 
@@ -39,56 +42,60 @@ func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 	var jobResult JobResult
 	json.Unmarshal(buf.Bytes(), &jobResult)
 
-	transactionReceipt := submitMessageToTopic(jobResult.Data.HederaTopicId, []byte(jobResult.Data.Result))
+	transactionReceipt, err := submitMessageToTopic(jobResult.Data.HederaTopicId, []byte(jobResult.Data.Result))
+	if err != nil {
+		log.Fatalln("Error: ", err)
+	}
 
 	fmt.Fprintf(res, "{\"transactionStatus\": \"/%v\"}", transactionReceipt.Status)
-
 }
 
-func submitMessageToTopic (hederaTopicId string, message []byte) hedera.TransactionReceipt {
-	err := godotenv.Load(".env")
-	if err != nil {
-		panic(fmt.Errorf("Unable to load environment variables from .env file. Error:\n%v\n", err))
-	}
-
-	myAccountId, err := hedera.AccountIDFromString(os.Getenv("HEDERA_ACCOUNT_ID"))
-	if err != nil {
-		panic(err)
-	}
-
-	myPrivateKey, err := hedera.PrivateKeyFromString(os.Getenv("HEDERA_PRIVATE_KEY"))
-	if err != nil {
-		panic(err)
-	}
-
-	client := hedera.ClientForTestnet()
-	client.SetOperator(myAccountId, myPrivateKey)
+func submitMessageToTopic (hederaTopicId string, message []byte) (hedera.TransactionReceipt, error) {
 
 	topicId, err := hedera.TopicIDFromString(hederaTopicId)
 
 	if err != nil {
-		panic(err)
+		return hedera.TransactionReceipt{}, err
 	}
 
 	transaction := hedera.NewTopicMessageSubmitTransaction().
 		SetTopicID(topicId).
 		SetMessage(message)
 
-	txResponse, err := transaction.Execute(client)
+	txResponse, err := transaction.Execute(hederaClient)
 	if err != nil {
-		panic(err)
+		return hedera.TransactionReceipt{}, err
 	}
 
-	transactionReceipt, err := txResponse.GetReceipt(client)
+	transactionReceipt, err := txResponse.GetReceipt(hederaClient)
 	if err != nil {
-		panic(err)
+		return hedera.TransactionReceipt{}, err
 	}
 
-	return transactionReceipt
+	return transactionReceipt, nil
 }
 
 
 func main() {
+
+	err := godotenv.Load(".env")
+	if err != nil {
+		panic(fmt.Errorf("Unable to load environment variables from .env file. Error:\n%v\n", err))
+	}
+
+	hederaAccountId, err := hedera.AccountIDFromString(os.Getenv("HEDERA_ACCOUNT_ID"))
+	if err != nil {
+		panic(err)
+	}
+
+	hederaPrivateKey, err := hedera.PrivateKeyFromString(os.Getenv("HEDERA_PRIVATE_KEY"))
+	if err != nil {
+		panic(err)
+	}
+
+
+	hederaClient = hedera.ClientForTestnet()
+	hederaClient.SetOperator(hederaAccountId, hederaPrivateKey)
 
 	http.HandleFunc("/", externalAdapterHandler)
 
