@@ -25,7 +25,7 @@ type DataJson struct {
 type Response struct {
 	JobRunID string `json:"jobRunID"`
 	Error    string `json:"error,omitempty"`
-	Data     string `json:"data"`
+	Data     string `json:"data,omitempty"`
 }
 
 var hederaClient *hedera.Client
@@ -45,9 +45,7 @@ func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(req.Body)
-
-	log.Println(buf.String())
-
+	
 	var jobResult JobResult
 	json.Unmarshal(buf.Bytes(), &jobResult)
 
