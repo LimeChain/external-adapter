@@ -22,9 +22,16 @@ type DataJson struct {
 	HederaTopicId string
 }
 
+type Response struct {
+	JobRunID string `json:"jobRunID"`
+	Error    string `json:"error,omitempty"`
+	Data     string `json:"data"`
+}
+
 var hederaClient *hedera.Client
 
 func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
+
 
 	if req.URL.Path != "/" {
 		http.Error(res, "404 not found.", http.StatusNotFound)
@@ -39,18 +46,32 @@ func externalAdapterHandler(res http.ResponseWriter, req *http.Request) {
 	buf := new(bytes.Buffer)
 	buf.ReadFrom(req.Body)
 
+	log.Println(buf.String())
+
 	var jobResult JobResult
 	json.Unmarshal(buf.Bytes(), &jobResult)
 
+	responseData := Response{}
 	transactionReceipt, err := submitMessageToTopic(jobResult.Data.HederaTopicId, []byte(jobResult.Data.Result))
 	if err != nil {
 		log.Println("Error: ", err)
+		responseData.Error = err.Error()
+	} else {
+		responseData.JobRunID = jobResult.Id
+		responseData.Data = transactionReceipt.Status.String()
 	}
 
-	fmt.Fprintf(res, "{\"transactionStatus\": \"/%v\"}", transactionReceipt.Status)
+	jsonResponse, err := json.Marshal(responseData)
+	if (err != nil) {
+		log.Println("Error: ", err)
+		http.Error(res, "500 Internal Server Error.", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(res, string(jsonResponse))
 }
 
-func submitMessageToTopic (hederaTopicId string, message []byte) (hedera.TransactionReceipt, error) {
+func submitMessageToTopic(hederaTopicId string, message []byte) (hedera.TransactionReceipt, error) {
 
 	topicId, err := hedera.TopicIDFromString(hederaTopicId)
 
@@ -75,7 +96,6 @@ func submitMessageToTopic (hederaTopicId string, message []byte) (hedera.Transac
 	return transactionReceipt, nil
 }
 
-
 func main() {
 
 	err := godotenv.Load(".env")
@@ -92,7 +112,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
 
 	hederaClient = hedera.ClientForTestnet()
 	hederaClient.SetOperator(hederaAccountId, hederaPrivateKey)
