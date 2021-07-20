@@ -18,7 +18,7 @@ type JobResult struct {
 }
 
 type DataJson struct {
-	Result        string
+	Result        json.RawMessage
 	HederaTopicId string
 }
 
